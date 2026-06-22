@@ -5,3 +5,847 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SSU — Controle de Agenda</title>
 <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<style>
+  :root {
+    --azul: #1F3864;
+    --azul-med: #2E5FA3;
+    --azul-lt: #EEF4FB;
+    --verde: #375623;
+    --verde-lt: #EDF7ED;
+    --laranja: #C55A11;
+    --laranja-lt: #FEF4EC;
+    --vermelho: #C00000;
+    --vermelho-lt: #FCEBEB;
+    --cinza: #F5F5F5;
+    --cinza-bd: #D6D6D6;
+    --texto: #1a1a1a;
+    --texto-sec: #555;
+    --branco: #fff;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --sombra: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #F0F2F5; color: var(--texto); min-height: 100vh; }
+
+  /* HEADER */
+  .header { background: var(--azul); color: #fff; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+  .header-logo { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; }
+  .header-sub { font-size: 12px; opacity: 0.6; margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .btn-auth { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: background 0.2s; }
+  .btn-auth:hover { background: rgba(255,255,255,0.25); }
+  .auth-status { font-size: 11px; opacity: 0.7; }
+
+  /* LAYOUT */
+  .app { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
+
+  /* CARD */
+  .card { background: var(--branco); border-radius: var(--radius); box-shadow: var(--sombra); overflow: hidden; }
+  .card-header { padding: 14px 18px 10px; border-bottom: 1px solid var(--cinza-bd); }
+  .card-title { font-size: 13px; font-weight: 700; color: var(--azul); text-transform: uppercase; letter-spacing: 0.05em; }
+  .card-body { padding: 16px 18px; }
+
+  /* FORMULÁRIO */
+  .form-group { margin-bottom: 12px; }
+  .form-label { font-size: 11px; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px; display: block; }
+  .form-input, .form-select, .form-textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--cinza-bd);
+    border-radius: var(--radius-sm); font-size: 13px; color: var(--texto);
+    background: var(--branco); transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--azul-med); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-textarea { resize: vertical; min-height: 60px; }
+
+  /* TIPO BADGES */
+  .tipo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tipo-btn { padding: 7px 8px; border: 1.5px solid var(--cinza-bd); border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; background: var(--branco); color: var(--texto-sec); }
+  .tipo-btn.ativo { border-color: var(--azul-med); background: var(--azul-lt); color: var(--azul); }
+  .tipo-btn:hover:not(.ativo) { background: var(--cinza); }
+
+  /* BTN PRINCIPAL */
+  .btn-primary { width: 100%; padding: 10px; background: var(--azul); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.2s; margin-top: 4px; }
+  .btn-primary:hover { background: var(--azul-med); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* CONFLITO ALERT */
+  .conflito-alert { background: var(--vermelho-lt); border: 1px solid #f5b5b5; border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 10px; font-size: 12px; color: var(--vermelho); display: none; }
+  .conflito-alert.visivel { display: block; }
+
+  /* CHEGADA/SAÍDA */
+  .ponto-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .ponto-card { border: 1px solid var(--cinza-bd); border-radius: var(--radius-sm); padding: 10px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .ponto-card:hover { background: var(--cinza); }
+  .ponto-card.registrado { background: var(--verde-lt); border-color: #90c490; }
+  .ponto-card-icon { font-size: 20px; margin-bottom: 4px; }
+  .ponto-card-label { font-size: 11px; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; }
+  .ponto-card-hora { font-size: 16px; font-weight: 700; color: var(--verde); margin-top: 2px; }
+
+  /* PAINEL SEMANAL */
+  .semana-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .semana-titulo { font-size: 13px; font-weight: 700; color: var(--azul); }
+  .nav-btn { background: none; border: 1px solid var(--cinza-bd); border-radius: 4px; padding: 3px 8px; cursor: pointer; font-size: 14px; color: var(--texto-sec); }
+  .nav-btn:hover { background: var(--cinza); }
+
+  /* GRADE SEMANAL */
+  .grade { display: grid; grid-template-columns: 44px repeat(5, 1fr); border-top: 1px solid var(--cinza-bd); border-left: 1px solid var(--cinza-bd); }
+  .grade-header { font-size: 10px; font-weight: 700; text-align: center; padding: 6px 2px; border-right: 1px solid var(--cinza-bd); border-bottom: 1px solid var(--cinza-bd); background: var(--cinza); color: var(--texto-sec); text-transform: uppercase; letter-spacing: 0.04em; }
+  .grade-hora { font-size: 9px; color: var(--texto-sec); text-align: right; padding: 0 4px 0 0; border-right: 1px solid var(--cinza-bd); border-bottom: 1px solid #eee; display: flex; align-items: flex-start; padding-top: 2px; height: 28px; }
+  .grade-cell { border-right: 1px solid var(--cinza-bd); border-bottom: 1px solid #eee; height: 28px; position: relative; }
+  .grade-cell.hoje { background: rgba(46,95,163,0.03); }
+
+  /* EVENTO NA GRADE */
+  .ev { position: absolute; left: 1px; right: 1px; border-radius: 3px; font-size: 9px; font-weight: 600; padding: 1px 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; z-index: 2; transition: opacity 0.15s; }
+  .ev:hover { opacity: 0.85; }
+  .ev.rh { background: #C7DCF5; color: #1F3864; border-left: 2px solid #2E5FA3; }
+  .ev.externo { background: #FCE4CD; color: #7B3B0E; border-left: 2px solid #C55A11; }
+  .ev.ponto { background: #D6EDDA; color: #2E5A2E; border-left: 2px solid #4CAF50; }
+  .ev.conflito { background: #F9CECE; color: #8B0000; border-left: 2px solid #C00000; }
+
+  /* LOG */
+  .log-lista { max-height: 200px; overflow-y: auto; }
+  .log-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--cinza-bd); font-size: 12px; }
+  .log-item:last-child { border-bottom: none; }
+  .log-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+  .log-dot.ok { background: var(--verde); }
+  .log-dot.erro { background: var(--vermelho); }
+  .log-dot.info { background: var(--azul-med); }
+  .log-texto { flex: 1; color: var(--texto-sec); line-height: 1.4; }
+  .log-hora { font-size: 10px; color: #999; flex-shrink: 0; }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat { background: var(--cinza); border-radius: var(--radius-sm); padding: 10px; text-align: center; }
+  .stat-val { font-size: 22px; font-weight: 700; color: var(--azul); }
+  .stat-label { font-size: 10px; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--azul); color: #fff; padding: 12px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-shadow: 0 4px 20px rgba(0,0,0,0.2); transform: translateY(80px); opacity: 0; transition: all 0.3s; z-index: 999; max-width: 320px; }
+  .toast.visivel { transform: translateY(0); opacity: 1; }
+  .toast.erro { background: var(--vermelho); }
+  .toast.ok { background: var(--verde); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.visivel { opacity: 1; pointer-events: all; }
+  .modal { background: var(--branco); border-radius: var(--radius); padding: 24px; width: 360px; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
+  .modal-title { font-size: 15px; font-weight: 700; color: var(--azul); margin-bottom: 12px; }
+  .modal-ev { background: var(--cinza); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px; font-size: 12px; line-height: 1.8; }
+  .modal-ev b { color: var(--azul); }
+  .modal-actions { display: flex; gap: 8px; }
+  .btn-sec { flex: 1; padding: 9px; border: 1px solid var(--cinza-bd); background: var(--branco); border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; color: var(--texto-sec); }
+  .btn-sec:hover { background: var(--cinza); }
+  .btn-confirm { flex: 1; padding: 9px; background: var(--azul); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-confirm:hover { background: var(--azul-med); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* AUTH BANNER */
+  .auth-banner { background: var(--laranja-lt); border: 1px solid #f5c5a0; border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: var(--laranja); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .auth-banner a { color: var(--azul-med); font-weight: 600; cursor: pointer; }
+
+  /* RESP */
+  @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
+
+  .tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .tag.rh { background: var(--azul-lt); color: var(--azul); }
+  .tag.externo { background: var(--laranja-lt); color: var(--laranja); }
+  .tag.ponto { background: var(--verde-lt); color: var(--verde); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-logo">SSU ADVOGADOS</div>
+    <div class="header-sub">Controle de Agenda — Victor Pomim</div>
+  </div>
+  <div class="header-right">
+    <span class="auth-status" id="authStatus">● Desconectado do Outlook</span>
+    <button class="btn-auth" onclick="iniciarAuth()">Conectar Outlook</button>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- COLUNA ESQUERDA -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- PONTO -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Chegada & Saída</div></div>
+      <div class="card-body">
+        <div class="ponto-grid">
+          <div class="ponto-card" id="cardChegada" onclick="registrarPonto('chegada')">
+            <div class="ponto-card-icon">🟢</div>
+            <div class="ponto-card-label">Chegada</div>
+            <div class="ponto-card-hora" id="horaChegada">—</div>
+          </div>
+          <div class="ponto-card" id="cardSaida" onclick="registrarPonto('saida')">
+            <div class="ponto-card-icon">🔴</div>
+            <div class="ponto-card-label">Saída</div>
+            <div class="ponto-card-hora" id="horaSaida">—</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--texto-sec);text-align:center" id="tempoNoEscritorio">—</div>
+      </div>
+    </div>
+
+    <!-- FORMULÁRIO -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Novo Compromisso</div></div>
+      <div class="card-body">
+        <div id="authBanner" class="auth-banner" style="display:none">
+          ⚠️ Conecte o Outlook para criar eventos automaticamente. <a onclick="iniciarAuth()">Conectar agora</a>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tipo</label>
+          <div class="tipo-grid">
+            <button class="tipo-btn ativo" onclick="setTipo(this,'externo')" data-tipo="externo">🤝 Reunião / Cliente</button>
+            <button class="tipo-btn" onclick="setTipo(this,'rh')" data-tipo="rh">📋 Bloco Projeto RH</button>
+            <button class="tipo-btn" onclick="setTipo(this,'interno')" data-tipo="interno">🏢 Interno / Admin</button>
+            <button class="tipo-btn" onclick="setTipo(this,'pessoal')" data-tipo="pessoal">⚡ Urgente</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Título</label>
+          <input class="form-input" id="evTitulo" placeholder="Ex: Reunião com cliente Fagotti" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Data</label>
+            <input class="form-input" id="evData" type="date" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pilar RH</label>
+            <select class="form-select" id="evPilar">
+              <option value="">— nenhum —</option>
+              <option>I — Gestão de Carteira</option>
+              <option>II — Trilha de Carreira</option>
+              <option>III — On the Job Training</option>
+              <option>IV — Comunicação Interna</option>
+              <option>V — Banco de Talentos</option>
+              <option>VI — Desenvolvimento</option>
+              <option>VII — Posicionamento RH</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Início</label>
+            <input class="form-input" id="evInicio" type="time" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fim</label>
+            <input class="form-input" id="evFim" type="time" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Observação</label>
+          <textarea class="form-textarea" id="evObs" placeholder="Pauta, local, participantes..."></textarea>
+        </div>
+
+        <div class="conflito-alert" id="conflitoAlert"></div>
+
+        <button class="btn-primary" id="btnLancar" onclick="lancarEvento()">
+          Lançar compromisso
+        </button>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Esta semana</div></div>
+      <div class="card-body">
+        <div class="stats-grid">
+          <div class="stat"><div class="stat-val" id="statTotal">0</div><div class="stat-label">Eventos</div></div>
+          <div class="stat"><div class="stat-val" id="statRH">0</div><div class="stat-label">Blocos RH</div></div>
+          <div class="stat"><div class="stat-val" id="statConflitos">0</div><div class="stat-label">Conflitos</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- COLUNA DIREITA -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- GRADE SEMANAL -->
+    <div class="card">
+      <div class="card-header">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="card-title">Visão Semanal</div>
+          <div class="semana-nav">
+            <button class="nav-btn" onclick="navSemana(-1)">‹</button>
+            <span class="semana-titulo" id="semanaLabel" style="margin:0 10px;"></span>
+            <button class="nav-btn" onclick="navSemana(1)">›</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:12px;overflow-x:auto;">
+        <div class="grade" id="grade"></div>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">Histórico de Ações</div></div>
+      <div class="card-body">
+        <div class="log-lista" id="logLista">
+          <div style="font-size:12px;color:var(--texto-sec);text-align:center;padding:16px;">Nenhuma ação registrada ainda.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAÇÃO -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title">Confirmar lançamento</div>
+    <div class="modal-ev" id="modalConteudo"></div>
+    <div id="conflitoModalAlert" style="background:var(--vermelho-lt);border:1px solid #f5b5b5;border-radius:6px;padding:10px;font-size:12px;color:var(--vermelho);margin-bottom:12px;display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn-sec" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-confirm" id="btnConfirmar" onclick="confirmarEvento()">Confirmar e criar no Outlook</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── ESTADO ──────────────────────────────────────────────────────────────────
+let tipoAtivo = 'externo';
+let eventos = JSON.parse(localStorage.getItem('ssu_eventos') || '[]');
+let ponto = JSON.parse(localStorage.getItem('ssu_ponto') || '{}');
+let semanaOffset = 0;
+let eventoEmEdicao = null;
+let msToken = null; // Microsoft Graph token
+
+// ─── BLOCOS RH FIXOS ─────────────────────────────────────────────────────────
+const DIAS_SEMANA = ['seg','ter','qua','qui','sex'];
+const BLOCOS_RH = [
+  { titulo: '🎯 Daily', inicio: '08:00', fim: '08:30', dias: [0,1,2,3,4], tipo: 'rh' },
+  { titulo: '📋 Trilha de Carreira', inicio: '08:30', fim: '10:30', dias: [0], tipo: 'rh' },
+  { titulo: '🎓 On the Job Training', inicio: '08:30', fim: '10:30', dias: [1], tipo: 'rh' },
+  { titulo: '📢 Comunicação Interna', inicio: '08:30', fim: '10:30', dias: [2], tipo: 'rh' },
+  { titulo: '🧠 Desenvolvimento', inicio: '08:30', fim: '10:30', dias: [3], tipo: 'rh' },
+  { titulo: '✉️ Report — Thiago', inicio: '08:00', fim: '09:30', dias: [4], tipo: 'rh' },
+  { titulo: '🔄 Revisão Semanal', inicio: '09:30', fim: '11:00', dias: [4], tipo: 'rh' },
+  { titulo: '☕ Pausa Ativa', inicio: '10:30', fim: '11:00', dias: [0,1,2,3,4], tipo: 'rh' },
+  { titulo: '💬 Conversa Desenv.', inicio: '11:00', fim: '12:00', dias: [1], tipo: 'rh' },
+  { titulo: '📊 People Analytics', inicio: '11:00', fim: '12:00', dias: [2], tipo: 'rh' },
+  { titulo: '🤖 Pesquisa IA', inicio: '11:00', fim: '12:00', dias: [3], tipo: 'rh' },
+  { titulo: '🤝 Alinhamento Sócios', inicio: '11:00', fim: '12:00', dias: [4], tipo: 'rh' },
+  { titulo: '🔍 Banco de Talentos', inicio: '14:00', fim: '15:30', dias: [0], tipo: 'rh' },
+  { titulo: '📁 Gestão de Carteira', inicio: '14:00', fim: '15:30', dias: [1], tipo: 'rh' },
+  { titulo: '⚖️ Política de RH', inicio: '14:00', fim: '15:30', dias: [2], tipo: 'rh' },
+  { titulo: '🔍 Banco — Pipeline', inicio: '14:00', fim: '15:30', dias: [3], tipo: 'rh' },
+  { titulo: '✅ Fechamento do Dia', inicio: '16:00', fim: '17:00', dias: [0,1,2,3,4], tipo: 'rh' },
+  { titulo: '🇧🇷 Inglês', inicio: '18:30', fim: '19:00', dias: [0,1,2,3,4], tipo: 'rh' },
+];
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  const hoje = new Date();
+  document.getElementById('evData').value = hoje.toISOString().split('T')[0];
+  document.getElementById('evInicio').value = '08:00';
+  document.getElementById('evFim').value = '09:00';
+  renderGrade();
+  renderStats();
+  renderPonto();
+
+  // Inicializar MSAL e processar redirect de retorno do login
+  const app = iniciarMSAL();
+  if (app) {
+    try {
+      const resp = await app.handleRedirectPromise();
+      if (resp && resp.accessToken) {
+        msToken = resp.accessToken;
+        localStorage.setItem('ssu_ms_token', resp.accessToken);
+        setAuthOk();
+        return;
+      }
+      // Verificar conta já logada (token em cache)
+      const accounts = app.getAllAccounts();
+      if (accounts.length > 0) {
+        try {
+          const silent = await app.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+          msToken = silent.accessToken;
+          localStorage.setItem('ssu_ms_token', silent.accessToken);
+          setAuthOk();
+          return;
+        } catch(e) { /* precisa login interativo */ }
+      }
+    } catch(e) { console.warn('MSAL init:', e); }
+  }
+
+  // Sem token — mostrar banner
+  document.getElementById('authBanner').style.display = 'flex';
+});
+
+// ─── AUTH MICROSOFT ───────────────────────────────────────────────────────────
+// ─── CONFIGURAÇÃO MSAL ───────────────────────────────────────────────────────
+const MSAL_CONFIG = {
+  auth: {
+    clientId: 'cf6169e3-5f83-425a-8dc8-2141a45e7bdc',
+    authority: 'https://login.microsoftonline.com/c9c25319-e2d6-41a6-9762-eb61031b8a1a',
+    redirectUri: 'https://victorpomim.github.io/ssu-agenda/',
+  },
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
+};
+const SCOPES = ['Calendars.ReadWrite', 'User.Read'];
+let msalApp = null;
+
+function iniciarMSAL() {
+  if (typeof msal === 'undefined') {
+    mostrarToast('Biblioteca MSAL não carregou. Verifique a conexão com internet.', 'erro');
+    return null;
+  }
+  if (!msalApp) msalApp = new msal.PublicClientApplication(MSAL_CONFIG);
+  return msalApp;
+}
+
+async function iniciarAuth() {
+  const app = iniciarMSAL();
+  if (!app) return;
+
+  // Verificar se há resposta de redirect pendente
+  try {
+    const resp = await app.handleRedirectPromise();
+    if (resp && resp.accessToken) {
+      msToken = resp.accessToken;
+      localStorage.setItem('ssu_ms_token', resp.accessToken);
+      setAuthOk();
+      return;
+    }
+  } catch(e) { console.warn('handleRedirectPromise:', e); }
+
+  // Tentar login silencioso primeiro
+  const accounts = app.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const silent = await app.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+      msToken = silent.accessToken;
+      localStorage.setItem('ssu_ms_token', silent.accessToken);
+      setAuthOk();
+      return;
+    } catch(e) { /* token expirado — fazer login interativo */ }
+  }
+
+  // Login interativo via popup (preferencial) com fallback para redirect
+  try {
+    const result = await app.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
+    if (result && result.accessToken) {
+      msToken = result.accessToken;
+      localStorage.setItem('ssu_ms_token', result.accessToken);
+      setAuthOk();
+    } else {
+      // Adquirir token após login
+      const tokenResult = await app.acquireTokenPopup({ scopes: SCOPES, account: result.account });
+      msToken = tokenResult.accessToken;
+      localStorage.setItem('ssu_ms_token', tokenResult.accessToken);
+      setAuthOk();
+    }
+  } catch(popupErr) {
+    // Popup bloqueado — usar redirect
+    if (popupErr.errorCode === 'popup_window_error' || popupErr.errorCode === 'empty_window_error') {
+      mostrarToast('Popup bloqueado. Redirecionando para login...', 'info');
+      await app.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
+    } else {
+      console.error('Auth error:', popupErr);
+      mostrarToast('Erro ao conectar: ' + (popupErr.errorMessage || popupErr.message), 'erro');
+    }
+  }
+}
+
+function ativarModoDemo() {
+  msToken = 'demo';
+  localStorage.setItem('ssu_ms_token', 'demo');
+  setAuthOk(true);
+  adicionarLog('info', 'Modo demo ativado — eventos serão simulados sem criar no Outlook real.');
+}
+
+function setAuthOk(demo = false) {
+  document.getElementById('authStatus').textContent = demo ? '● Modo demo' : '● Outlook conectado';
+  document.getElementById('authStatus').style.color = '#7fffb0';
+  document.getElementById('authBanner').style.display = 'none';
+  document.querySelector('.btn-auth').textContent = demo ? 'Modo demo' : '✓ Conectado';
+  if (!demo) adicionarLog('ok', 'Outlook conectado com sucesso via Microsoft Graph.');
+}
+
+// ─── TIPO ─────────────────────────────────────────────────────────────────────
+function setTipo(btn, tipo) {
+  document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('ativo'));
+  btn.classList.add('ativo');
+  tipoAtivo = tipo;
+  verificarConflito();
+}
+
+// ─── PONTO ────────────────────────────────────────────────────────────────────
+function registrarPonto(tipo) {
+  const agora = new Date();
+  const horaStr = agora.toTimeString().slice(0,5);
+  const chave = new Date().toISOString().split('T')[0];
+  if (!ponto[chave]) ponto[chave] = {};
+  ponto[chave][tipo] = horaStr;
+  localStorage.setItem('ssu_ponto', JSON.stringify(ponto));
+  renderPonto();
+  adicionarLog('ok', `${tipo === 'chegada' ? 'Chegada' : 'Saída'} registrada às ${horaStr}.`);
+
+  // Criar evento no Outlook
+  if (msToken && tipo === 'chegada') {
+    criarEventoOutlook({ titulo: '📍 Chegada no escritório', inicio: horaStr, fim: horaStr, data: chave, tipo: 'ponto', obs: '' });
+  }
+}
+
+function renderPonto() {
+  const chave = new Date().toISOString().split('T')[0];
+  const p = ponto[chave] || {};
+  if (p.chegada) {
+    document.getElementById('horaChegada').textContent = p.chegada;
+    document.getElementById('cardChegada').classList.add('registrado');
+  }
+  if (p.saida) {
+    document.getElementById('horaSaida').textContent = p.saida;
+    document.getElementById('cardSaida').classList.add('registrado');
+  }
+  if (p.chegada && p.saida) {
+    const [hc,mc] = p.chegada.split(':').map(Number);
+    const [hs,ms] = p.saida.split(':').map(Number);
+    const total = (hs*60+ms) - (hc*60+mc);
+    const h = Math.floor(total/60), m = total%60;
+    document.getElementById('tempoNoEscritorio').textContent = `⏱ ${h}h${m > 0 ? m+'min' : ''} no escritório`;
+  }
+}
+
+// ─── CONFLITOS ────────────────────────────────────────────────────────────────
+function toMin(t) { const [h,m] = t.split(':').map(Number); return h*60+m; }
+
+function detectarConflitos(data, inicio, fim, ignorarId = null) {
+  const conflit = [];
+  const iMin = toMin(inicio), fMin = toMin(fim);
+  const diaSem = new Date(data+'T12:00:00').getDay(); // 0=dom,1=seg
+  const diaIdx = diaSem === 0 ? 6 : diaSem - 1; // 0=seg
+
+  // Verificar blocos RH
+  BLOCOS_RH.forEach(b => {
+    if (!b.dias.includes(diaIdx)) return;
+    const bi = toMin(b.inicio), bf = toMin(b.fim);
+    if (iMin < bf && fMin > bi) conflit.push(b.titulo);
+  });
+
+  // Verificar eventos lançados
+  eventos.forEach(e => {
+    if (e.id === ignorarId) return;
+    if (e.data !== data) return;
+    const ei = toMin(e.inicio), ef = toMin(e.fim);
+    if (iMin < ef && fMin > ei) conflit.push(e.titulo);
+  });
+
+  return conflit;
+}
+
+function verificarConflito() {
+  const data = document.getElementById('evData').value;
+  const inicio = document.getElementById('evInicio').value;
+  const fim = document.getElementById('evFim').value;
+  if (!data || !inicio || !fim) return;
+  const conflitos = detectarConflitos(data, inicio, fim);
+  const el = document.getElementById('conflitoAlert');
+  if (conflitos.length > 0) {
+    el.textContent = `⚠️ Conflito com: ${conflitos.join(', ')}`;
+    el.classList.add('visivel');
+  } else {
+    el.classList.remove('visivel');
+  }
+}
+
+['evData','evInicio','evFim'].forEach(id => {
+  document.getElementById(id).addEventListener('change', verificarConflito);
+});
+
+// ─── LANÇAR EVENTO ────────────────────────────────────────────────────────────
+function lancarEvento() {
+  const titulo = document.getElementById('evTitulo').value.trim();
+  const data = document.getElementById('evData').value;
+  const inicio = document.getElementById('evInicio').value;
+  const fim = document.getElementById('evFim').value;
+  const obs = document.getElementById('evObs').value.trim();
+  const pilar = document.getElementById('evPilar').value;
+
+  if (!titulo || !data || !inicio || !fim) { mostrarToast('Preencha título, data e horários.', 'erro'); return; }
+  if (toMin(fim) <= toMin(inicio)) { mostrarToast('Horário de fim deve ser após o início.', 'erro'); return; }
+
+  const conflitos = detectarConflitos(data, inicio, fim);
+  eventoEmEdicao = { titulo, data, inicio, fim, obs, pilar, tipo: tipoAtivo, id: Date.now() };
+
+  // Montar modal
+  const dataFmt = new Date(data+'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
+  document.getElementById('modalConteudo').innerHTML = `
+    <b>Título:</b> ${titulo}<br>
+    <b>Data:</b> ${dataFmt}<br>
+    <b>Horário:</b> ${inicio} – ${fim}<br>
+    ${pilar ? `<b>Pilar RH:</b> ${pilar}<br>` : ''}
+    ${obs ? `<b>Obs:</b> ${obs}` : ''}
+  `;
+
+  const ca = document.getElementById('conflitoModalAlert');
+  if (conflitos.length > 0) {
+    ca.textContent = `⚠️ Conflito detectado com: ${conflitos.join(', ')}. Deseja lançar mesmo assim?`;
+    ca.style.display = 'block';
+  } else { ca.style.display = 'none'; }
+
+  document.getElementById('btnConfirmar').textContent = msToken ? 'Confirmar e criar no Outlook' : 'Confirmar (sem Outlook)';
+  document.getElementById('modalOverlay').classList.add('visivel');
+}
+
+function fecharModal() {
+  document.getElementById('modalOverlay').classList.remove('visivel');
+  eventoEmEdicao = null;
+}
+
+async function confirmarEvento() {
+  if (!eventoEmEdicao) return;
+  const btn = document.getElementById('btnConfirmar');
+  btn.innerHTML = '<span class="spinner"></span>Criando...';
+  btn.disabled = true;
+
+  eventos.push(eventoEmEdicao);
+  localStorage.setItem('ssu_eventos', JSON.stringify(eventos));
+
+  let outlookOk = false;
+  if (msToken && msToken !== 'demo') {
+    outlookOk = await criarEventoOutlook(eventoEmEdicao);
+  } else if (msToken === 'demo') {
+    await new Promise(r => setTimeout(r, 800));
+    outlookOk = true;
+  }
+
+  fecharModal();
+  renderGrade();
+  renderStats();
+  limparFormulario();
+
+  const msg = outlookOk
+    ? `✓ "${eventoEmEdicao.titulo}" criado no Outlook.`
+    : `✓ "${eventoEmEdicao.titulo}" salvo localmente${msToken !== 'demo' ? ' (falha no Outlook)' : ' (modo demo)'}.`;
+
+  adicionarLog(outlookOk ? 'ok' : 'info', msg);
+  mostrarToast(msg, outlookOk ? 'ok' : 'info');
+
+  btn.innerHTML = 'Confirmar e criar no Outlook';
+  btn.disabled = false;
+  eventoEmEdicao = null;
+}
+
+// ─── MICROSOFT GRAPH ──────────────────────────────────────────────────────────
+async function criarEventoOutlook(ev) {
+  if (!msToken || msToken === 'demo') return false;
+  try {
+    // Renovar token silenciosamente se necessário
+    const app = iniciarMSAL();
+    if (app) {
+      const accounts = app.getAllAccounts();
+      if (accounts.length > 0) {
+        try {
+          const silent = await app.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+          msToken = silent.accessToken;
+        } catch(e) { /* usar token atual */ }
+      }
+    }
+    const body = {
+      subject: ev.titulo,
+      body: { contentType: 'text', content: ev.obs || '' },
+      start: { dateTime: `${ev.data}T${ev.inicio}:00`, timeZone: 'America/Sao_Paulo' },
+      end:   { dateTime: `${ev.data}T${ev.fim}:00`,   timeZone: 'America/Sao_Paulo' },
+    };
+    const res = await fetch('https://graph.microsoft.com/v1.0/me/events', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${msToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 401) {
+      msToken = null;
+      localStorage.removeItem('ssu_ms_token');
+      document.getElementById('authStatus').textContent = '● Token expirado — reconecte';
+      document.querySelector('.btn-auth').textContent = 'Conectar Outlook';
+      document.getElementById('authBanner').style.display = 'flex';
+      return false;
+    }
+    return res.ok;
+  } catch(e) { console.error('Graph error:', e); return false; }
+}
+
+// ─── GRADE SEMANAL ────────────────────────────────────────────────────────────
+const HORAS_INICIO = 7, HORAS_FIM = 20;
+const DIAS_NOMES = ['Seg','Ter','Qua','Qui','Sex'];
+
+function semanaAtual() {
+  const hoje = new Date();
+  hoje.setDate(hoje.getDate() + semanaOffset * 7);
+  const diaSem = hoje.getDay();
+  const diff = diaSem === 0 ? -6 : 1 - diaSem;
+  const seg = new Date(hoje); seg.setDate(hoje.getDate() + diff);
+  return Array.from({length:5}, (_, i) => { const d = new Date(seg); d.setDate(seg.getDate()+i); return d; });
+}
+
+function navSemana(dir) { semanaOffset += dir; renderGrade(); renderStats(); }
+
+function renderGrade() {
+  const dias = semanaAtual();
+  const hoje = new Date().toDateString();
+
+  // Label da semana
+  const opts = { day:'2-digit', month:'short' };
+  document.getElementById('semanaLabel').textContent =
+    `${dias[0].toLocaleDateString('pt-BR', opts)} – ${dias[4].toLocaleDateString('pt-BR', opts)}`;
+
+  const grade = document.getElementById('grade');
+  grade.innerHTML = '';
+  const totalHoras = HORAS_FIM - HORAS_INICIO;
+  const totalCels = totalHoras * 2; // slots de 30min
+
+  // Headers
+  const hEmpty = document.createElement('div'); hEmpty.className = 'grade-header'; grade.appendChild(hEmpty);
+  dias.forEach((d, i) => {
+    const h = document.createElement('div');
+    h.className = 'grade-header';
+    h.innerHTML = `${DIAS_NOMES[i]}<br><span style="font-weight:400;font-size:9px">${d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>`;
+    if (d.toDateString() === hoje) h.style.color = '#2E5FA3';
+    grade.appendChild(h);
+  });
+
+  // Células
+  for (let slot = 0; slot < totalCels; slot++) {
+    const hora = HORAS_INICIO + slot / 2;
+    const h = Math.floor(hora);
+    const m = slot % 2 === 0 ? '00' : '30';
+    const hCell = document.createElement('div');
+    hCell.className = 'grade-hora';
+    if (slot % 2 === 0) hCell.textContent = `${h}h`;
+    grade.appendChild(hCell);
+
+    dias.forEach((d, dIdx) => {
+      const cell = document.createElement('div');
+      cell.className = 'grade-cell' + (d.toDateString() === hoje ? ' hoje' : '');
+      cell.style.position = 'relative';
+      grade.appendChild(cell);
+    });
+  }
+
+  // Renderizar eventos sobre a grade
+  // Posicionamento: cada slot = 28px de altura
+  const SLOT_H = 28;
+
+  function posicionarEvento(container, inicio, fim, tipo, titulo, diaIdx) {
+    const iMin = toMin(inicio) - HORAS_INICIO * 60;
+    const fMin = toMin(fim) - HORAS_INICIO * 60;
+    if (iMin < 0 || fMin > totalHoras * 60) return;
+    const top = (iMin / 30) * SLOT_H;
+    const height = ((fMin - iMin) / 30) * SLOT_H - 1;
+    const ev = document.createElement('div');
+    ev.className = `ev ${tipo}`;
+    ev.style.top = top + 'px';
+    ev.style.height = height + 'px';
+    ev.title = `${titulo} (${inicio}–${fim})`;
+    ev.textContent = titulo;
+    container.appendChild(ev);
+  }
+
+  // Mapear células por dia
+  // A grade tem: 1 col hora + 5 cols dia, repetida por slot
+  // Cada dia tem seu próprio "container" virtual: vamos usar divs sobrepostos
+  const gradeEl = document.getElementById('grade');
+  const baseTop = 28; // altura do header em px (approx)
+
+  // Criar overlays por coluna de dia
+  dias.forEach((d, dIdx) => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position:absolute;top:${baseTop}px;left:${(44 + dIdx * ((gradeEl.offsetWidth-44)/5))}px;width:${(gradeEl.offsetWidth-44)/5}px;height:${totalCels*SLOT_H}px;pointer-events:none;`;
+
+    // Blocos RH
+    BLOCOS_RH.forEach(b => {
+      if (!b.dias.includes(dIdx)) return;
+      posicionarEvento(overlay, b.inicio, b.fim, 'rh', b.titulo, dIdx);
+    });
+
+    // Eventos lançados
+    const dataStr = d.toISOString().split('T')[0];
+    eventos.filter(e => e.data === dataStr).forEach(e => {
+      const conflit = detectarConflitos(e.data, e.inicio, e.fim, e.id).length > 0;
+      posicionarEvento(overlay, e.inicio, e.fim, conflit ? 'conflito' : (e.tipo === 'rh' ? 'rh' : 'externo'), e.titulo, dIdx);
+    });
+
+    // Ponto
+    const p = ponto[dataStr];
+    if (p && p.chegada) posicionarEvento(overlay, p.chegada, p.chegada.split(':')[0]+':'+String(parseInt(p.chegada.split(':')[1])+15).padStart(2,'0'), 'ponto', '📍 Chegada', dIdx);
+
+    gradeEl.style.position = 'relative';
+    gradeEl.appendChild(overlay);
+  });
+
+  renderStats();
+}
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
+function renderStats() {
+  const dias = semanaAtual();
+  const datas = dias.map(d => d.toISOString().split('T')[0]);
+  const evSemana = eventos.filter(e => datas.includes(e.data));
+  const rhCount = evSemana.filter(e => e.tipo === 'rh').length;
+  let conflitos = 0;
+  evSemana.forEach(e => { if (detectarConflitos(e.data, e.inicio, e.fim, e.id).length > 0) conflitos++; });
+  document.getElementById('statTotal').textContent = evSemana.length;
+  document.getElementById('statRH').textContent = rhCount;
+  document.getElementById('statConflitos').textContent = conflitos;
+  if (conflitos > 0) document.getElementById('statConflitos').style.color = '#C00000';
+  else document.getElementById('statConflitos').style.color = 'var(--azul)';
+}
+
+// ─── LOG ──────────────────────────────────────────────────────────────────────
+function adicionarLog(tipo, texto) {
+  const lista = document.getElementById('logLista');
+  if (lista.querySelector('div[style]')) lista.innerHTML = '';
+  const hora = new Date().toTimeString().slice(0,5);
+  const item = document.createElement('div');
+  item.className = 'log-item';
+  item.innerHTML = `<div class="log-dot ${tipo}"></div><div class="log-texto">${texto}</div><div class="log-hora">${hora}</div>`;
+  lista.insertBefore(item, lista.firstChild);
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function mostrarToast(msg, tipo = 'info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast visivel ${tipo}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('visivel'), 3500);
+}
+
+// ─── LIMPAR FORM ─────────────────────────────────────────────────────────────
+function limparFormulario() {
+  document.getElementById('evTitulo').value = '';
+  document.getElementById('evObs').value = '';
+  document.getElementById('evPilar').value = '';
+  document.getElementById('conflitoAlert').classList.remove('visivel');
+}
+
+// Fechar modal clicando fora
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) fecharModal();
+});
+</script>
+</body>
+</html>
